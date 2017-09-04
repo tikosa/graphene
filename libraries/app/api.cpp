@@ -304,6 +304,9 @@ namespace graphene { namespace app {
             } case balance_object_type:{
                /** these are free from any accounts */
                break;
+            } case bonus_object_type:{
+               /** these are free from any accounts */
+               break;
             }
           }
        }
@@ -362,6 +365,12 @@ namespace graphene { namespace app {
                   break;
                  case impl_fba_accumulator_object_type:
                   break;
+                 case impl_account_bonus_object_type:{
+                  const auto& aobj = dynamic_cast<const account_bonus_object*>(obj);
+                  assert( aobj != nullptr );
+                  result.push_back( aobj->owner );
+                  break;
+                 }
           }
        }
        return result;

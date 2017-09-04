@@ -42,6 +42,11 @@ struct get_impacted_account_visitor
       _impacted.insert( op.to );
    }
 
+   void operator()( const transfer_bonus_operation& op )
+   {
+      _impacted.insert( op.to );
+   }
+
    void operator()( const asset_claim_fees_operation& op ){}
    void operator()( const limit_order_create_operation& op ) {}
    void operator()( const limit_order_cancel_operation& op )
@@ -163,6 +168,7 @@ struct get_impacted_account_visitor
    void operator()( const custom_operation& op ) {}
    void operator()( const assert_operation& op ) {}
    void operator()( const balance_claim_operation& op ) {}
+   void operator()( const bonus_claim_operation& op ) {}
 
    void operator()( const override_transfer_operation& op )
    {

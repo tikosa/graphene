@@ -40,6 +40,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/bonus_object.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
 
@@ -283,6 +284,24 @@ class database_api
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
 
       vector<vesting_balance_object> get_vesting_balances( account_id_type account_id )const;
+
+      //////////////
+      // Bonuses  //
+      //////////////
+
+      /**
+       * @brief Get an account's bonuses in various assets
+       * @param id ID of the account to get bonuses for
+       * @param assets IDs of the assets to get bonuses of; if empty, get all assets account has a bonus in
+       * @return Bonuses of the account
+       */
+      vector<asset> get_account_bonuses(account_id_type id, const flat_set<asset_id_type>& assets)const;
+
+      /// Semantically equivalent to @ref get_account_bonuses, but takes a name instead of an ID.
+      vector<asset> get_named_account_bonuses(const std::string& name, const flat_set<asset_id_type>& assets)const;
+
+      /** @return all unclaimed bonus objects for a set of addresses */
+      vector<bonus_object> get_bonus_objects( const vector<address>& addrs )const;
 
       /**
        * @brief Get the total number of accounts registered with the blockchain
@@ -608,6 +627,11 @@ FC_API(graphene::app::database_api,
    (get_balance_objects)
    (get_vested_balances)
    (get_vesting_balances)
+
+   // Bonuses
+   (get_account_bonuses)
+   (get_named_account_bonuses)
+   (get_bonus_objects)
 
    // Assets
    (get_assets)

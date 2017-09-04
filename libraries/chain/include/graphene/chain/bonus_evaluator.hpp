@@ -22,37 +22,27 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/operations.hpp>
-#include <graphene/chain/evaluator.hpp>
+
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/bonus_object.hpp>
+#include <graphene/chain/evaluator.hpp>
 
 namespace graphene { namespace chain {
 
-   class transfer_evaluator : public evaluator<transfer_evaluator>
-   {
-      public:
-         typedef transfer_operation operation_type;
+class bonus_claim_evaluator : public evaluator<bonus_claim_evaluator>
+{
+public:
+   typedef bonus_claim_operation operation_type;
 
-         void_result do_evaluate( const transfer_operation& o );
-         void_result do_apply( const transfer_operation& o );
-   };
+   const bonus_object* bonus = nullptr;
 
-   class override_transfer_evaluator : public evaluator<override_transfer_evaluator>
-   {
-      public:
-         typedef override_transfer_operation operation_type;
+   void_result do_evaluate(const bonus_claim_operation& op);
 
-         void_result do_evaluate( const override_transfer_operation& o );
-         void_result do_apply( const override_transfer_operation& o );
-   };
-
-   class transfer_bonus_evaluator : public evaluator<transfer_bonus_evaluator>
-   {
-      public:
-         typedef transfer_bonus_operation operation_type;
-
-         void_result do_evaluate( const transfer_bonus_operation& o );
-         void_result do_apply( const transfer_bonus_operation& o );
-   };
+   /**
+    * @note the fee is always 0 for this particular operation because once the
+    * bonus is claimed it frees up memory and it cannot be used to spam the network
+    */
+   void_result do_apply(const bonus_claim_operation& op);
+};
 
 } } // graphene::chain

@@ -153,6 +153,8 @@ namespace graphene { namespace chain {
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( claimed_too_often, balance_claim, 1, "balance claimed too often" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( invalid_claim_amount, balance_claim, 2, "invalid claim amount" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, balance_claim, 3, "owner mismatch" )
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( bonus_claim );
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, bonus_claim, 1, "bonus owner mismatch" )
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( override_transfer );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( not_permitted, override_transfer, 1, "not permitted" )

@@ -313,6 +313,14 @@ class wallet_api
        * @returns a list of the given account's balances
        */
       vector<asset>                     list_account_balances(const string& id);
+      /** List the bonuses of an account.
+       * Each account can have multiple bonuses, one for each type of asset owned by that 
+       * account.  The returned list will only contain assets for which the account has a
+       * nonzero bonus
+       * @param id the name or id of the account whose bonuses you want
+       * @returns a list of the given account's bonuses
+       */
+      vector<asset>                     list_account_bonuses(const string& id);
       /** Lists all assets registered on the blockchain.
        * 
        * To list all assets, pass the empty string \c "" for the lowerbound to start
@@ -610,6 +618,12 @@ class wallet_api
        */
       vector< signed_transaction > import_balance( string account_name_or_id, const vector<string>& wif_keys, bool broadcast );
 
+      /**
+       * This call will construct transaction(s) that will claim all bonuses controled
+       * by wif_keys and deposit them into the given account.
+       */
+      vector< signed_transaction > import_bonus( string account_name_or_id, const vector<string>& wif_keys, bool broadcast );
+
       /** Transforms a brain key to reduce the chance of errors when re-entering the key from memory.
        *
        * This takes a user-supplied brain key and normalizes it into the form used
@@ -720,6 +734,25 @@ class wallet_api
          return std::make_pair(trx.id(),trx);
       }
 
+
+      /** Transfer a bonus from one account to another.
+       * @param from the name or id of the account sending the funds
+       * @param to the name or id of the account receiving the funds
+       * @param amount the amount to send (in nominal units -- to send half of a BTS, specify 0.5)
+       * @param asset_symbol the symbol or id of the asset to send
+       * @param memo a memo to attach to the transaction.  The memo will be encrypted in the 
+       *             transaction and readable for the receiver.  There is no length limit
+       *             other than the limit imposed by maximum transaction size, but transaction
+       *             increase with transaction size
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction transferring funds
+       */
+      signed_transaction  transfer_bonus(string from,
+                                        string to,
+                                        string amount,
+                                        string asset_symbol,
+                                        string memo,
+                                        bool broadcast = false);
 
       /**
        *  This method is used to convert a JSON transaction to its transactin ID.
@@ -1559,11 +1592,13 @@ FC_API( graphene::wallet::wallet_api,
         (list_my_accounts)
         (list_accounts)
         (list_account_balances)
+        (list_account_bonuses)
         (list_assets)
         (import_key)
         (import_accounts)
         (import_account_keys)
         (import_balance)
+        (import_bonus)
         (suggest_brain_key)
         (register_account)
         (upgrade_account)
@@ -1575,6 +1610,7 @@ FC_API( graphene::wallet::wallet_api,
         (cancel_order)
         (transfer)
         (transfer2)
+        (transfer_bonus)
         (get_transaction_id)
         (create_asset)
         (update_asset)

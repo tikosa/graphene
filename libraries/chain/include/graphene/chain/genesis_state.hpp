@@ -98,6 +98,11 @@ struct genesis_state_type {
       string owner_name;
       share_type daily_pay;
    };
+   struct initial_bonus_type {
+      address owner;
+      string asset_symbol;
+      share_type amount;
+   };
 
    time_point_sec                           initial_timestamp;
    share_type                               max_core_supply = GRAPHENE_MAX_SHARE_SUPPLY;
@@ -111,6 +116,7 @@ struct genesis_state_type {
    vector<initial_witness_type>             initial_witness_candidates;
    vector<initial_committee_member_type>    initial_committee_candidates;
    vector<initial_worker_type>              initial_worker_candidates;
+   vector<initial_bonus_type>               initial_bonuses;
 
    /**
     * Temporary, will be moved elsewhere.
@@ -147,9 +153,12 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_worker_type, (owner_name)(daily_pay))
 
+FC_REFLECT(graphene::chain::genesis_state_type::initial_bonus_type,
+           (owner)(asset_symbol)(amount))
+
 FC_REFLECT(graphene::chain::genesis_state_type,
            (initial_timestamp)(max_core_supply)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
-           (initial_committee_candidates)(initial_worker_candidates)
+           (initial_committee_candidates)(initial_worker_candidates)(initial_bonuses)
            (initial_chain_id)
            (immutable_parameters))

@@ -109,6 +109,27 @@ namespace graphene { namespace chain {
          void  adjust_balance(const asset& delta);
    };
 
+   /**
+    * @brief Tracks the bonus of a single account/asset pair
+    * @ingroup object
+    *
+    * This object is indexed on owner and asset_type so that black swan
+    * events in asset_type can be processed quickly.
+    */
+   class account_bonus_object : public abstract_object<account_bonus_object>
+   {
+      public:
+         static const uint8_t space_id = implementation_ids;
+         static const uint8_t type_id  = impl_account_bonus_object_type;
+
+         account_id_type   owner;
+         asset_id_type     asset_type;
+         share_type        bonus;
+
+         asset get_bonus()const { return asset(bonus, asset_type); }
+         void  adjust_bonus(const asset& delta);
+   };
+
 
    /**
     * @brief This class represents an account on the object graph
@@ -346,6 +367,41 @@ namespace graphene { namespace chain {
     */
    typedef generic_index<account_balance_object, account_balance_object_multi_index_type> account_balance_index;
 
+   /**
+    * @ingroup object_index
+    */
+   typedef multi_index_container<
+      account_bonus_object,
+      indexed_by<
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_account_asset>,
+            composite_key<
+               account_bonus_object,
+               member<account_bonus_object, account_id_type, &account_bonus_object::owner>,
+               member<account_bonus_object, asset_id_type, &account_bonus_object::asset_type>
+            >
+         >,
+         ordered_unique< tag<by_asset_balance>,
+            composite_key<
+               account_bonus_object,
+               member<account_bonus_object, asset_id_type, &account_bonus_object::asset_type>,
+               member<account_bonus_object, share_type, &account_bonus_object::bonus>,
+               member<account_bonus_object, account_id_type, &account_bonus_object::owner>
+            >,
+            composite_key_compare<
+               std::less< asset_id_type >,
+               std::greater< share_type >,
+               std::less< account_id_type >
+            >
+         >
+      >
+   > account_bonus_object_multi_index_type;
+
+   /**
+    * @ingroup object_index
+    */
+   typedef generic_index<account_bonus_object, account_bonus_object_multi_index_type> account_bonus_index;
+
    struct by_name{};
 
    /**
@@ -381,6 +437,10 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
 FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
                     (graphene::db::object),
                     (owner)(asset_type)(balance) )
+
+FC_REFLECT_DERIVED( graphene::chain::account_bonus_object,
+                    (graphene::db::object),
+                    (owner)(asset_type)(bonus) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
                     (graphene::chain::object),

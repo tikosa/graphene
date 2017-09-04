@@ -64,6 +64,7 @@ add_library( graphene_chain
 
              evaluator.cpp
              balance_evaluator.cpp
+             bonus_evaluator.cpp
              account_evaluator.cpp
              assert_evaluator.cpp
              witness_evaluator.cpp

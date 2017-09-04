@@ -92,6 +92,11 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
       vector<vesting_balance_object> get_vesting_balances( account_id_type account_id )const;
 
+      // Bonuses
+      vector<asset> get_account_bonuses(account_id_type id, const flat_set<asset_id_type>& assets)const;
+      vector<asset> get_named_account_bonuses(const std::string& name, const flat_set<asset_id_type>& assets)const;
+      vector<bonus_object> get_bonus_objects( const vector<address>& addrs )const;
+
       // Assets
       vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
@@ -754,6 +759,81 @@ vector<balance_object> database_api_impl::get_balance_objects( const vector<addr
       const auto& by_owner_idx = bal_idx.indices().get<by_owner>();
 
       vector<balance_object> result;
+
+      for( const auto& owner : addrs )
+      {
+         subscribe_to_item( owner );
+         auto itr = by_owner_idx.lower_bound( boost::make_tuple( owner, asset_id_type(0) ) );
+         while( itr != by_owner_idx.end() && itr->owner == owner )
+         {
+            result.push_back( *itr );
+            ++itr;
+         }
+      }
+      return result;
+   }
+   FC_CAPTURE_AND_RETHROW( (addrs) )
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Bonuses                                                          //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<asset> database_api::get_account_bonuses(account_id_type id, const flat_set<asset_id_type>& assets)const
+{
+   return my->get_account_bonuses( id, assets );
+}
+
+vector<asset> database_api_impl::get_account_bonuses(account_id_type acnt, const flat_set<asset_id_type>& assets)const
+{
+   vector<asset> result;
+   if (assets.empty())
+   {
+      // if the caller passes in an empty list of assets, return bonuses for all assets the account owns
+      const auto& balance_index = _db.get_index_type<account_bonus_index>();
+      auto range = balance_index.indices().get<by_account_asset>().equal_range(boost::make_tuple(acnt));
+      for (const auto& bonus : boost::make_iterator_range(range.first, range.second))
+         result.push_back(asset(bonus.get_bonus()));
+   }
+   else
+   {
+      result.reserve(assets.size());
+
+      std::transform(assets.begin(), assets.end(), std::back_inserter(result),
+                     [this, acnt](asset_id_type id) { return _db.get_bonus(acnt, id); });
+   }
+
+   return result;
+}
+
+vector<asset> database_api::get_named_account_bonuses(const std::string& name, const flat_set<asset_id_type>& assets)const
+{
+   return my->get_named_account_balances( name, assets );
+}
+
+vector<asset> database_api_impl::get_named_account_bonuses(const std::string& name, const flat_set<asset_id_type>& assets) const
+{
+   const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
+   auto itr = accounts_by_name.find(name);
+   FC_ASSERT( itr != accounts_by_name.end() );
+   return get_account_bonuses(itr->get_id(), assets);
+}
+
+vector<bonus_object> database_api::get_bonus_objects( const vector<address>& addrs )const
+{
+   return my->get_bonus_objects( addrs );
+}
+
+vector<bonus_object> database_api_impl::get_bonus_objects( const vector<address>& addrs )const
+{
+   try
+   {
+      const auto& bal_idx = _db.get_index_type<bonus_index>();
+      const auto& by_owner_idx = bal_idx.indices().get<by_owner>();
+
+      vector<bonus_object> result;
 
       for( const auto& owner : addrs )
       {

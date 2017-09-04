@@ -46,6 +46,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/bonus_object.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
@@ -61,6 +62,7 @@
 #include <graphene/chain/withdraw_permission_evaluator.hpp>
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
+#include <graphene/chain/bonus_evaluator.hpp>
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
@@ -152,6 +154,7 @@ void database::initialize_evaluators()
    register_evaluator<call_order_update_evaluator>();
    register_evaluator<transfer_evaluator>();
    register_evaluator<override_transfer_evaluator>();
+   register_evaluator<transfer_bonus_evaluator>();
    register_evaluator<asset_fund_fee_pool_evaluator>();
    register_evaluator<asset_publish_feeds_evaluator>();
    register_evaluator<proposal_create_evaluator>();
@@ -167,6 +170,7 @@ void database::initialize_evaluators()
    register_evaluator<withdraw_permission_delete_evaluator>();
    register_evaluator<worker_create_evaluator>();
    register_evaluator<balance_claim_evaluator>();
+   register_evaluator<bonus_claim_evaluator>();
    register_evaluator<transfer_to_blind_evaluator>();
    register_evaluator<transfer_from_blind_evaluator>();
    register_evaluator<blind_transfer_evaluator>();
@@ -199,6 +203,7 @@ void database::initialize_indexes()
    add_index< primary_index<worker_index> >();
    add_index< primary_index<balance_index> >();
    add_index< primary_index<blinded_balance_index> >();
+   add_index< primary_index<bonus_index> >();
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();
@@ -216,6 +221,7 @@ void database::initialize_indexes()
    add_index< primary_index< buyback_index                                > >();
 
    add_index< primary_index< simple_index< fba_accumulator_object       > > >();
+   add_index< primary_index<account_bonus_index                           > >();
 }
 
 void database::init_genesis(const genesis_state_type& genesis_state)
@@ -535,6 +541,18 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       const auto asset_id = get_asset_id(handout.asset_symbol);
       create<balance_object>([&handout,&get_asset_id,total_allocation,asset_id](balance_object& b) {
          b.balance = asset(handout.amount, asset_id);
+         b.owner = handout.owner;
+      });
+
+      total_supplies[ asset_id ] += handout.amount;
+   }
+
+   // Create initial bonuses
+   for( const auto& handout : genesis_state.initial_bonuses )
+   {
+      const auto asset_id = get_asset_id(handout.asset_symbol);
+      create<bonus_object>([&handout,&get_asset_id,total_allocation,asset_id](bonus_object& b) {
+         b.bonus = asset(handout.amount, asset_id);
          b.owner = handout.owner;
       });
 

@@ -78,6 +78,48 @@ void database::adjust_balance(account_id_type account, asset delta )
 
 } FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
 
+asset database::get_bonus(account_id_type owner, asset_id_type asset_id) const
+{
+   auto& index = get_index_type<account_bonus_index>().indices().get<by_account_asset>();
+   auto itr = index.find(boost::make_tuple(owner, asset_id));
+   if( itr == index.end() )
+      return asset(0, asset_id);
+   return itr->get_bonus();
+}
+
+asset database::get_bonus(const account_object& owner, const asset_object& asset_obj) const
+{
+   return get_bonus(owner.get_id(), asset_obj.get_id());
+}
+
+void database::adjust_bonus(account_id_type account, asset delta )
+{ try {
+   if( delta.amount == 0 )
+      return;
+
+   auto& index = get_index_type<account_bonus_index>().indices().get<by_account_asset>();
+   auto itr = index.find(boost::make_tuple(account, delta.asset_id));
+   if(itr == index.end())
+   {
+      FC_ASSERT( delta.amount > 0, "Insufficient Bonus: ${a}'s bonus of ${b} is less than required ${r}", 
+                 ("a",account(*this).name)
+                 ("b",to_pretty_string(asset(0,delta.asset_id)))
+                 ("r",to_pretty_string(-delta)));
+      create<account_bonus_object>([account,&delta](account_bonus_object& b) {
+         b.owner = account;
+         b.asset_type = delta.asset_id;
+         b.bonus = delta.amount.value;
+      });
+   } else {
+      if( delta.amount < 0 )
+         FC_ASSERT( itr->get_bonus() >= -delta, "Insufficient Bonus: ${a}'s bonus of ${b} is less than required ${r}", ("a",account(*this).name)("b",to_pretty_string(itr->get_bonus()))("r",to_pretty_string(-delta)));
+      modify(*itr, [delta](account_bonus_object& b) {
+         b.adjust_bonus(delta);
+      });
+   }
+
+} FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
+
 optional< vesting_balance_id_type > database::deposit_lazy_vesting(
    const optional< vesting_balance_id_type >& ovbid,
    share_type amount, uint32_t req_vesting_seconds,

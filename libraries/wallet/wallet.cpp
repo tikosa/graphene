@@ -708,6 +708,7 @@ public:
    }
 
    vector< signed_transaction > import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast );
+   vector< signed_transaction > import_bonus( string name_or_id, const vector<string>& wif_keys, bool broadcast );
 
    bool load_wallet_file(string wallet_filename = "")
    {
@@ -2028,6 +2029,41 @@ public:
       return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (from)(to)(amount)(asset_symbol)(memo)(broadcast) ) }
 
+   signed_transaction transfer_bonus(string from, string to, string amount,
+                               string asset_symbol, string memo, bool broadcast /* = false */)
+   { try {
+      FC_ASSERT( !self.is_locked() );
+      fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+      FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+      account_object from_account = get_account(from);
+      account_object to_account = get_account(to);
+      account_id_type from_id = from_account.id;
+      account_id_type to_id = get_account_id(to);
+
+      transfer_bonus_operation xfer_op;
+
+      xfer_op.from = from_id;
+      xfer_op.to = to_id;
+      xfer_op.amount = asset_obj->amount_from_string(amount);
+
+      if( memo.size() )
+         {
+            xfer_op.memo = memo_data();
+            xfer_op.memo->from = from_account.options.memo_key;
+            xfer_op.memo->to = to_account.options.memo_key;
+            xfer_op.memo->set_message(get_private_key(from_account.options.memo_key),
+                                      to_account.options.memo_key, memo);
+         }
+
+      signed_transaction tx;
+      tx.operations.push_back(xfer_op);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction(tx, broadcast);
+   } FC_CAPTURE_AND_RETHROW( (from)(to)(amount)(asset_symbol)(memo)(broadcast) ) }
+
    signed_transaction issue_asset(string to_account, string amount, string symbol,
                                   string memo, bool broadcast = false)
    {
@@ -2090,6 +2126,21 @@ public:
       };
 
       m["list_account_balances"] = [this](variant result, const fc::variants& a)
+      {
+         auto r = result.as<vector<asset>>();
+         vector<asset_object> asset_recs;
+         std::transform(r.begin(), r.end(), std::back_inserter(asset_recs), [this](const asset& a) {
+            return get_asset(a.asset_id);
+         });
+
+         std::stringstream ss;
+         for( unsigned i = 0; i < asset_recs.size(); ++i )
+            ss << asset_recs[i].amount_to_pretty_string(r[i]) << "\n";
+
+         return ss.str();
+      };
+
+      m["list_account_bonuses"] = [this](variant result, const fc::variants& a)
       {
          auto r = result.as<vector<asset>>();
          vector<asset_object> asset_recs;
@@ -2762,6 +2813,13 @@ vector<asset> wallet_api::list_account_balances(const string& id)
    return my->_remote_db->get_account_balances(get_account(id).id, flat_set<asset_id_type>());
 }
 
+vector<asset> wallet_api::list_account_bonuses(const string& id)
+{
+   if( auto real_id = detail::maybe_id<account_id_type>(id) )
+      return my->_remote_db->get_account_bonuses(*real_id, flat_set<asset_id_type>());
+   return my->_remote_db->get_account_bonuses(get_account(id).id, flat_set<asset_id_type>());
+}
+
 vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
 {
    return my->_remote_db->list_assets( lowerbound, limit );
@@ -3131,6 +3189,13 @@ signed_transaction wallet_api::transfer(string from, string to, string amount,
 {
    return my->transfer(from, to, amount, asset_symbol, memo, broadcast);
 }
+
+signed_transaction wallet_api::transfer_bonus(string from, string to, string amount,
+                                        string asset_symbol, string memo, bool broadcast /* = false */)
+{
+   return my->transfer_bonus(from, to, amount, asset_symbol, memo, broadcast);
+}
+
 signed_transaction wallet_api::create_asset(string issuer,
                                             string symbol,
                                             uint8_t precision,
@@ -3460,6 +3525,12 @@ string wallet_api::gethelp(const string& method)const
       ss << "example: transfer \"1.3.11\" \"1.3.4\" 1000.03 CORE \"memo\" true\n";
       ss << "example: transfer \"usera\" \"userb\" 1000.123 CORE \"memo\" true\n";
    }
+   else if( method == "transfer_bonus" )
+   {
+      ss << "usage: transfer_bonus FROM TO AMOUNT SYMBOL \"memo\" BROADCAST\n\n";
+      ss << "example: transfer_bonus \"1.3.11\" \"1.3.4\" 1000.03 CORE \"memo\" true\n";
+      ss << "example: transfer_bonus \"usera\" \"userb\" 1000.123 CORE \"memo\" true\n";
+   }
    else if( method == "create_account_with_brain_key" )
    {
       ss << "usage: create_account_with_brain_key BRAIN_KEY ACCOUNT_NAME REGISTRAR REFERRER BROADCAST\n\n";
@@ -3487,6 +3558,18 @@ string wallet_api::gethelp(const string& method)const
       ss << "\nExample value of BITASSET_OPTIONS: \n";
       ss << fc::json::to_pretty_string( graphene::chain::bitasset_options() );
       ss << "\nBITASSET_OPTIONS may be null\n";
+   }
+   else if( method == "list_account_bonuses" )
+   {
+      ss << "usage: list_account_bonuses ACCOUNT_NAME_OR_ID\n\n";
+      ss << "example: list_account_bonuses usera\n";
+      ss << "example: list_account_bonuses \"1.3.11\" \n";
+   }
+   else if( method == "import_bonus" )
+   {
+      ss << "usage: import_bonus ACCOUNT_NAME_OR_ID  WIF_PRIVATE_KEY BROADCAST\n\n";
+      ss << "example: import_bonus usera 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3 true\n";
+      ss << "example: import_bonus \"1.3.11\" 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3 true\n";
    }
    else
    {
@@ -3564,6 +3647,11 @@ void wallet_api::set_password( string password )
 vector< signed_transaction > wallet_api::import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast )
 {
    return my->import_balance( name_or_id, wif_keys, broadcast );
+}
+
+vector< signed_transaction > wallet_api::import_bonus( string name_or_id, const vector<string>& wif_keys, bool broadcast )
+{
+   return my->import_bonus( name_or_id, wif_keys, broadcast );
 }
 
 namespace detail {
@@ -3670,6 +3758,118 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
       for( const address& addr : ctx.addrs )
          signed_tx.sign( keys[addr], _chain_id );
       // if the key for a balance object was the same as a key for the account we're importing it into,
+      // we may end up with duplicate signatures, so remove those
+      boost::erase(signed_tx.signatures, boost::unique<boost::return_found_end>(boost::sort(signed_tx.signatures)));
+      result.push_back( signed_tx );
+      if( broadcast )
+         _remote_net_broadcast->broadcast_transaction(signed_tx);
+   }
+
+   return result;
+} FC_CAPTURE_AND_RETHROW( (name_or_id) ) }
+
+vector< signed_transaction > wallet_api_impl::import_bonus( string name_or_id, const vector<string>& wif_keys, bool broadcast )
+{ try {
+   FC_ASSERT(!is_locked());
+   const dynamic_global_property_object& dpo = _remote_db->get_dynamic_global_properties();
+   account_object claimer = get_account( name_or_id );
+   uint32_t max_ops_per_tx = 30;
+
+   map< address, private_key_type > keys;  // local index of address -> private key
+   vector< address > addrs;
+   bool has_wildcard = false;
+   addrs.reserve( wif_keys.size() );
+   for( const string& wif_key : wif_keys )
+   {
+      if( wif_key == "*" )
+      {
+         if( has_wildcard )
+            continue;
+         for( const public_key_type& pub : _wallet.extra_keys[ claimer.id ] )
+         {
+            addrs.push_back( pub );
+            auto it = _keys.find( pub );
+            if( it != _keys.end() )
+            {
+               fc::optional< fc::ecc::private_key > privkey = wif_to_key( it->second );
+               FC_ASSERT( privkey );
+               keys[ addrs.back() ] = *privkey;
+            }
+            else
+            {
+               wlog( "Somehow _keys has no private key for extra_keys public key ${k}", ("k", pub) );
+            }
+         }
+         has_wildcard = true;
+      }
+      else
+      {
+         optional< private_key_type > key = wif_to_key( wif_key );
+         FC_ASSERT( key.valid(), "Invalid private key" );
+         fc::ecc::public_key pk = key->get_public_key();
+         addrs.push_back( pk );
+         keys[addrs.back()] = *key;
+         // see chain/balance_evaluator.cpp
+         addrs.push_back( pts_address( pk, false, 56 ) );
+         keys[addrs.back()] = *key;
+         addrs.push_back( pts_address( pk, true, 56 ) );
+         keys[addrs.back()] = *key;
+         addrs.push_back( pts_address( pk, false, 0 ) );
+         keys[addrs.back()] = *key;
+         addrs.push_back( pts_address( pk, true, 0 ) );
+         keys[addrs.back()] = *key;
+      }
+   }
+
+   vector< bonus_object > bonuses = _remote_db->get_bonus_objects( addrs );
+   wdump((bonuses));
+   addrs.clear();
+
+   set<asset_id_type> bon_types;
+   for( auto b : bonuses ) bon_types.insert( b.bonus.asset_id );
+
+   struct claim_tx
+   {
+      vector< bonus_claim_operation > ops;
+      set< address > addrs;
+   };
+   vector< claim_tx > claim_txs;
+
+   for( const asset_id_type& a : bon_types )
+   {
+      bonus_claim_operation op;
+      op.deposit_to_account = claimer.id;
+      for( const auto& b : bonuses )
+      {
+         if( b.bonus.asset_id == a )
+         {
+            op.total_claimed = b.available( dpo.time );
+            if( op.total_claimed.amount == 0 )
+               continue;
+            op.bonus_to_claim = b.id;
+            op.bonus_owner_key = keys[b.owner].get_public_key();
+            if( (claim_txs.empty()) || (claim_txs.back().ops.size() >= max_ops_per_tx) )
+               claim_txs.emplace_back();
+            claim_txs.back().ops.push_back(op);
+            claim_txs.back().addrs.insert(b.owner);
+         }
+      }
+   }
+
+   vector< signed_transaction > result;
+
+   for( const claim_tx& ctx : claim_txs )
+   {
+      signed_transaction tx;
+      tx.operations.reserve( ctx.ops.size() );
+      for( const auto& op : ctx.ops )
+         tx.operations.emplace_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+      signed_transaction signed_tx = sign_transaction( tx, false );
+      for( const address& addr : ctx.addrs )
+         signed_tx.sign( keys[addr], _chain_id );
+      // if the key for a bonus object was the same as a key for the account we're importing it into,
       // we may end up with duplicate signatures, so remove those
       boost::erase(signed_tx.signatures, boost::unique<boost::return_found_end>(boost::sort(signed_tx.signatures)));
       result.push_back( signed_tx );

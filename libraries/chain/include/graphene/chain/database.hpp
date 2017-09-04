@@ -295,6 +295,23 @@ namespace graphene { namespace chain {
          void adjust_balance(account_id_type account, asset delta);
 
          /**
+          * @brief Retrieve a particular account's bonus in a given asset
+          * @param owner Account whose bonus should be retrieved
+          * @param asset_id ID of the asset to get bonus in
+          * @return owner's bonus in asset
+          */
+         asset get_bonus(account_id_type owner, asset_id_type asset_id)const;
+         /// This is an overloaded method.
+         asset get_bonus(const account_object& owner, const asset_object& asset_obj)const;
+
+         /**
+          * @brief Adjust a particular account's bonus in a given asset by a delta
+          * @param account ID of account whose bonus should be adjusted
+          * @param delta Asset ID and amount to adjust bonus by
+          */
+         void adjust_bonus(account_id_type account, asset delta);
+
+         /**
           * @brief Helper to make lazy deposit to CDD VBO.
           *
           * If the given optional VBID is not valid(),
